@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NRI KYC Onboarding – Prototype | DataMatrix.AI</title>
+<style>
+:root{--navy:#1E2761;--ice:#CADCFC;--gold:#C9A24B;--bg:#F4F6FB;--ink:#2A2E45;--mut:#6B7280;--ok:#15803d;--warn:#b45309;--bad:#b91c1c}
+*{box-sizing:border-box}
+body{margin:0;font-family:Calibri,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--navy);color:#fff;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+header b{letter-spacing:3px;color:var(--gold);font-size:13px}
+header h1{margin:2px 0 0;font-size:20px;font-family:Cambria,serif}
+.pill{background:#2B3A85;color:var(--ice);padding:5px 12px;border-radius:99px;font-size:12px}
+nav{display:flex;gap:6px;padding:16px 28px 0;flex-wrap:wrap}
+nav div{flex:1;min-width:130px;padding:10px 12px;border-radius:8px;background:#e3e8f2;color:var(--mut);font-size:13px;font-weight:700}
+nav div.on{background:var(--navy);color:#fff}
+nav div.done{background:var(--ice);color:var(--navy)}
+main{padding:18px 28px 40px;max-width:1080px;margin:auto}
+.card{background:#fff;border:1px solid #e3e8f2;border-radius:10px;padding:20px;margin-bottom:16px}
+h2{font-family:Cambria,serif;color:var(--navy);margin:0 0 12px;font-size:22px}
+h3{margin:0 0 8px;color:var(--navy);font-size:15px}
+.row{display:flex;gap:14px;flex-wrap:wrap}
+.row>*{flex:1;min-width:230px}
+label{font-size:12px;font-weight:700;color:var(--mut);display:block;margin-bottom:4px}
+select{width:100%;padding:9px;border:1px solid #cfd6e6;border-radius:6px;font-size:14px}
+button{border:0;border-radius:6px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;background:var(--navy);color:#fff}
+button.alt{background:#fff;color:var(--navy);border:1px solid var(--navy)}
+button.gold{background:var(--gold);color:#1a1a1a}
+button.bad{background:var(--bad)}button.ok{background:var(--ok)}
+button:disabled{opacity:.4;cursor:not-allowed}
+.acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.slot{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1px dashed #b8c2dc;border-radius:8px;margin-bottom:10px;background:#fafbff}
+.slot small{color:var(--mut);display:block}
+.b{padding:2px 9px;border-radius:99px;font-size:12px;font-weight:700;white-space:nowrap}
+.pass{background:#dcfce7;color:var(--ok)}.warn{background:#fef3c7;color:var(--warn)}.fail{background:#fee2e2;color:var(--bad)}.na{background:#e5e7eb;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{text-align:left;padding:9px 8px;border-bottom:1px solid #eef1f8;vertical-align:top}
+th{color:var(--mut);font-size:12px}
+.kv{font-size:13px;line-height:1.6}.kv span{color:var(--mut)}
+.banner{padding:16px 20px;border-radius:10px;font-size:18px;font-weight:700;margin-bottom:16px}
+.banner.pass{background:#dcfce7}.banner.warn{background:#fef3c7}.banner.fail{background:#fee2e2}
+.prog div{padding:8px 0;color:var(--mut)}.prog div.d{color:var(--ok);font-weight:700}
+.note{font-size:12px;color:var(--mut);margin-top:10px}
+footer{text-align:center;font-size:12px;color:var(--mut);padding:0 20px 30px}
+</style>
+</head>
+<body>
+<header>
+  <div><b>DATAMATRIX.AI</b><h1>NRI KYC Onboarding – Compliant Integration Layer</h1></div>
+  <span class="pill">🔒 Prototype · runs entirely in your browser · no data leaves your device</span>
+</header>
+<nav id="nav"></nav>
+<main id="app"></main>
+<footer>Prototype for demonstration only. Document extraction is simulated with sample data; policy rules are illustrative and configurable per institution.</footer>
+
+<script>
+const DOCS=[
+ {id:'passport',label:'Foreign Passport',hint:'Identity & nationality'},
+ {id:'oci',label:'OCI Card / Visa',hint:'Overseas Citizen of India or valid visa'},
+ {id:'pan',label:'PAN Card',hint:'Indian tax identity'},
+ {id:'address',label:'Overseas Address Proof',hint:'Utility bill / bank statement'},
+ {id:'fatca',label:'FATCA / CRS Self-Certification',hint:'Tax residency declaration'}
+];
+const POLICY={
+ US:{n:'United States',route:'Assisted video-KYC + notarised / apostilled proof',note:'FATCA US-person indicia review; PFIC filter applies at portfolio stage.'},
+ AE:{n:'United Arab Emirates',route:'Video-KYC eligible + attested address proof',note:'CRS reporting jurisdiction; watch for US-person indicia on declarations.'},
+ GB:{n:'United Kingdom',route:'Video-KYC eligible; address proof ≤ 90 days',note:'CRS self-certification required.'},
+ SG:{n:'Singapore',route:'Video-KYC eligible; address proof ≤ 90 days',note:'CRS self-certification required.'},
+ CA:{n:'Canada',route:'Assisted video-KYC + notarised proof',note:'CRS self-certification; verify tax residency country.'}
+};
+const ago=n=>{const t=new Date();t.setDate(t.getDate()-n);return t.toISOString().slice(0,10)};
+function SAMPLE(sc){
+ const ok=sc==='clean';
+ return {
+  passport:{Name:'RAJESH KUMAR NAIR',DOB:'1985-03-14','Passport No':'Z1234567',Expiry:ok?'2031-06-30':ago(-75)},
+  oci:{Name:ok?'RAJESH KUMAR NAIR':'RAJESH K NAIR',DOB:'1985-03-14','OCI No':'OCI-USA-88231'},
+  pan:{Name:'RAJESH KUMAR NAIR',DOB:'1985-03-14','PAN':ok?'ABCPN1234F':'ABCPN12345'},
+  address:{Name:ok?'RAJESH KUMAR NAIR':'RAJESH NAIR',Address:ok?'12 Maple St, Austin TX 78701, USA':'Villa 4, JLT, Dubai, UAE',Issued:ago(ok?35:140)},
+  fatca:{Name:'RAJESH KUMAR NAIR','Tax Residency':ok?'US':'US',Signed:'Yes'}
+ };
+}
+const S={step:1,country:'US',scenario:'clean',files:{},res:null,audit:[],decision:null,prog:0};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function log(m){S.audit.push({time:new Date().toISOString(),event:m})}
+function go(n){S.step=n;render()}
+
+function loadSample(sc){
+ S.scenario=sc;S.country=sc==='clean'?'US':'AE';S.res=null;S.decision=null;S.audit=[];
+ DOCS.forEach(d=>S.files[d.id]=d.id+'_sample.pdf');
+ log('Case created with sample data ('+sc+')');S.step=2;render();
+}
+function blank(){S.scenario='clean';S.files={};S.res=null;S.decision=null;S.audit=[];log('Blank case created');S.step=2;render()}
+function setFile(id,inp){
+ const f=inp.files[0];if(!f)return;
+ S.files[id]=f.name;S.res=null;S.decision=null;log('Document received: '+DOCS.find(d=>d.id===id).label+' ('+f.name+')');render();
+}
+
+const norm=s=>String(s).toUpperCase().replace(/[^A-Z ]/g,'').split(/\s+/).filter(Boolean);
+function nameCmp(a,b){
+ const A=norm(a),B=norm(b);
+ if(A.join(' ')===B.join(' '))return 'pass';
+ const [s,l]=A.length<=B.length?[A,B]:[B,A];
+ const m=(x,y)=>x===y||(x.length===1&&y[0]===x)||(y.length===1&&x[0]===y);
+ return s.every(t=>l.some(u=>m(t,u)))?'warn':'fail';
+}
+const worst=a=>a.includes('fail')?'fail':a.includes('warn')?'warn':'pass';
+
+function run(){
+ const smp=SAMPLE(S.scenario),ext={};
+ DOCS.forEach(d=>{if(S.files[d.id])ext[d.id]=smp[d.id]});
+ const C=[],P=POLICY[S.country];
+ const missing=DOCS.filter(d=>!ext[d.id]).map(d=>d.label);
+ C.push({n:'Document completeness',s:missing.length?'fail':'pass',d:missing.length?'Missing: '+missing.join(', '):'All 5 required documents received'});
+ const ref=ext.passport?.Name;
+ if(ref){
+  const ns=Object.entries(ext).filter(([k])=>k!=='passport').map(([k,v])=>[k,nameCmp(ref,v.Name)]);
+  const w=worst(ns.map(x=>x[1]));
+  const bad=ns.filter(x=>x[1]!=='pass').map(x=>DOCS.find(d=>d.id===x[0]).label+' ('+ext[x[0]].Name+')');
+  C.push({n:'Name consistency vs passport',s:w,d:w==='pass'?'Names match across all documents':(w==='warn'?'Partial / initial-only match: ':'Mismatch: ')+bad.join('; ')});
+ } else C.push({n:'Name consistency vs passport',s:'na',d:'Passport not provided'});
+ const dobs=['passport','oci','pan'].filter(k=>ext[k]).map(k=>ext[k].DOB);
+ C.push({n:'Date of birth consistency',s:dobs.length<2?'na':new Set(dobs).size===1?'pass':'fail',d:dobs.length<2?'Not enough documents':new Set(dobs).size===1?'DOB identical on '+dobs.length+' documents':'DOB differs across documents'});
+ if(ext.passport){
+  const mo=(new Date(ext.passport.Expiry)-Date.now())/(86400000*30.44);
+  C.push({n:'Passport validity (≥ 6 months)',s:mo>=6?'pass':'fail',d:'Expires '+ext.passport.Expiry+' (~'+Math.max(0,Math.round(mo))+' months left)'});
+ } else C.push({n:'Passport validity (≥ 6 months)',s:'na',d:'Passport not provided'});
+ if(ext.pan){const okp=/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(ext.pan.PAN);C.push({n:'PAN format validation',s:okp?'pass':'fail',d:okp?ext.pan.PAN+' is a valid format':ext.pan.PAN+' is not a valid PAN format'})}
+ else C.push({n:'PAN format validation',s:'na',d:'PAN not provided'});
+ if(ext.address){
+  const age=Math.round((Date.now()-new Date(ext.address.Issued))/86400000);
+  C.push({n:'Address proof recency (≤ 90 days)',s:age<=90?'pass':'fail',d:'Issued '+age+' days ago'});
+ } else C.push({n:'Address proof recency (≤ 90 days)',s:'na',d:'Address proof not provided'});
+ if(ext.fatca){
+  const t=ext.fatca['Tax Residency'],ok=t===S.country;
+  C.push({n:'FATCA / CRS declaration',s:ok?'pass':'warn',d:ok?'Tax residency ('+t+') matches country of residence':'Declared tax residency '+t+' differs from residence '+S.country+' → US-person indicia; W-9 / enhanced reporting needed'});
+ } else C.push({n:'FATCA / CRS declaration',s:'na',d:'Self-certification not provided'});
+ C.push({n:'AML / sanctions screening (simulated)',s:ref?'pass':'na',d:ref?'No watchlist or PEP hits for '+ref:'Awaiting identity document'});
+ const w=worst(C.map(c=>c.s));
+ const verdict=w==='fail'?'Hold – issues must be resolved':w==='warn'?'Needs RM review before approval':'Ready for human sign-off';
+ return {ext,checks:C,verdict,cls:w};
+}
+
+function verify(){
+ S.step=3;S.res=null;S.prog=0;render();
+ const t=setInterval(()=>{S.prog++;if(S.prog>=4){clearInterval(t);S.res=run();log('AI verification completed → '+S.res.verdict)}render()},500);
+}
+function decide(x){
+ S.decision=x;log('Human decision by RM: '+x);render();
+}
+function exportAudit(){
+ const data={country:S.country,policy:POLICY[S.country],documents:S.files,result:S.res&&{verdict:S.res.verdict,checks:S.res.checks},decision:S.decision,audit:S.audit};
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+ a.download='kyc_audit_trail.json';a.click();
+}
+
+function render(){
+ const names=['1 · Case','2 · Documents','3 · AI Verification','4 · Review & Audit'];
+ $('#nav').innerHTML=names.map((n,i)=>`<div class="${S.step===i+1?'on':S.step>i+1?'done':''}">${n}</div>`).join('');
+ const el=$('#app');
+ if(S.step===1){
+  const P=POLICY[S.country];
+  el.innerHTML=`<div class="card"><h2>Start an NRI onboarding case</h2>
+   <div class="row"><div><label>Country of residence</label><select onchange="S.country=this.value;render()">${Object.entries(POLICY).map(([k,v])=>`<option value="${k}" ${k===S.country?'selected':''}>${v.n}</option>`).join('')}</select></div>
+   <div class="card" style="background:#f4f6fb;margin:0"><h3>Permissible route (policy engine)</h3><div class="kv"><span>Route:</span> ${P.route}<br><span>Note:</span> ${P.note}</div></div></div>
+   <div class="acts"><button onclick="blank()">Start blank case →</button>
+   <button class="gold" onclick="loadSample('clean')">Load sample: clean case</button>
+   <button class="alt" onclick="loadSample('issues')">Load sample: case with issues</button></div>
+   <p class="note">Tip for demos: run the “case with issues” sample to show name mismatch, expired passport, invalid PAN, stale address proof and US-person indicia being caught automatically.</p></div>`;
+ }
+ if(S.step===2){
+  el.innerHTML=`<div class="card"><h2>Upload documents · ${POLICY[S.country].n}</h2>
+   ${DOCS.map(d=>`<div class="slot"><div><b>${d.label}</b><small>${d.hint}</small>${S.files[d.id]?`<small>📎 ${esc(S.files[d.id])}</small>`:''}</div>
+    <div><span class="b ${S.files[d.id]?'pass':'na'}">${S.files[d.id]?'Received':'Pending'}</span>
+    <label style="display:inline-block;margin:0 0 0 8px;cursor:pointer;color:var(--navy);text-decoration:underline">${S.files[d.id]?'Replace':'Upload'}<input type="file" style="display:none" onchange="setFile('${d.id}',this)"></label></div></div>`).join('')}
+   <div class="acts"><button class="alt" onclick="go(1)">← Back</button><button ${Object.keys(S.files).length?'':'disabled'} onclick="verify()">Run AI verification →</button></div>
+   <p class="note">Files are never uploaded anywhere. Extraction is simulated with a sample applicant profile so the full workflow can be demonstrated.</p></div>`;
+ }
+ if(S.step===3){
+  if(!S.res){
+   const st=['Classifying documents','Extracting fields (OCR + layout AI)','Cross-matching identity data','Running policy, FATCA/CRS & AML checks'];
+   el.innerHTML=`<div class="card"><h2>AI verification in progress…</h2><div class="prog">${st.map((x,i)=>`<div class="${i<S.prog?'d':''}">${i<S.prog?'✔':'○'} ${x}</div>`).join('')}</div></div>`;
+  } else {
+   const r=S.res;
+   el.innerHTML=`<div class="banner ${r.cls}">${r.cls==='pass'?'✅':r.cls==='warn'?'⚠️':'⛔'} ${r.verdict}</div>
+   <div class="card"><h2>Verification checks</h2><table><tr><th>Check</th><th>Result</th><th>Detail</th></tr>
+   ${r.checks.map(c=>`<tr><td>${c.n}</td><td><span class="b ${c.s}">${c.s==='pass'?'PASS':c.s==='warn'?'REVIEW':c.s==='fail'?'FAIL':'N/A'}</span></td><td>${esc(c.d)}</td></tr>`).join('')}</table></div>
+   <div class="card"><h2>Extracted data</h2><div class="row">${DOCS.filter(d=>r.ext[d.id]).map(d=>`<div class="card kv" style="margin:0;background:#fafbff"><h3>${d.label}</h3>${Object.entries(r.ext[d.id]).map(([k,v])=>`<span>${k}:</span> ${esc(v)}<br>`).join('')}</div>`).join('')}</div></div>
+   <div class="acts"><button class="alt" onclick="go(2)">← Documents</button><button onclick="go(4)">Proceed to human review →</button></div>`;
+  }
+ }
+ if(S.step===4){
+  const r=S.res,blocked=!r||r.cls==='fail';
+  el.innerHTML=`<div class="card"><h2>Relationship Manager sign-off</h2>
+   <p>${r?`AI recommendation: <b>${r.verdict}</b>`:'Run verification first.'} Approval is blocked while any check has failed — AI never onboards on its own.</p>
+   ${S.decision?`<div class="banner ${S.decision==='Approved'?'pass':S.decision==='Rejected'?'fail':'warn'}">Decision recorded: ${S.decision}</div>`:''}
+   <div class="acts"><button class="ok" ${blocked||S.decision?'disabled':''} onclick="decide('Approved')">Approve</button>
+   <button class="gold" ${!r||S.decision?'disabled':''} onclick="decide('Info requested from client')">Request more info</button>
+   <button class="bad" ${!r||S.decision?'disabled':''} onclick="decide('Rejected')">Reject</button>
+   <button class="alt" onclick="go(3)">← Results</button></div></div>
+   <div class="card"><h2>Audit trail</h2><table><tr><th>Timestamp (UTC)</th><th>Event</th></tr>
+   ${S.audit.map(a=>`<tr><td>${a.time.replace('T',' ').slice(0,19)}</td><td>${esc(a.event)}</td></tr>`).join('')}</table>
+   <div class="acts"><button class="alt" onclick="exportAudit()">⬇ Export audit trail (JSON)</button><button class="alt" onclick="location.reload()">Start new case</button></div>
+   <p class="note">Production version: India-hosted self-hosted models, zero data egress, PII tokenisation, immutable audit store, connectors to core banking / PMS.</p></div>`;
+ }
+}
+render();
+</script>
+</body>
+</html>
